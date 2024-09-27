@@ -9,8 +9,15 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-from oscar.defaults import *
 from pathlib import Path
+from oscar.defaults import *
+from decouple import config as env_config
+
+try: 
+    from decouple import config
+except:
+    import os
+    config = os.environ.get
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -23,10 +30,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-ffi@_p7pbfydjb$92=546h^hk76q)lwt9tzijs$nt=w%^!@t^0"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config("DJANGO_DEBUG", cast=bool, default=False)
 
 ALLOWED_HOSTS = []
-
 
 # Application definition
 
@@ -37,6 +43,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    "blog",
 
     'django.contrib.sites',
     'django.contrib.flatpages',
@@ -137,6 +144,8 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        "ATOMIC_REQUESTS": True,
+
     }
 }
 
@@ -177,8 +186,42 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
+CLOUDFLARE_R2_BUCKET=config("CLOUDFLARE_R2_BUCKET", cast=str, default='django')
+CLOUDFLARE_R2_ACCESS_KEY=config("CLOUDFLARE_R2_ACCESS_KEY")
+CLOUDFLARE_R2_SECRET_KEY=config("CLOUDFLARE_R2_SECRET_KEY")
+CLOUDFLARE_R2_BUCKET_ENDPOINT=config("CLOUDFLARE_R2_BUCKET_ENDPOINT")
+
+CLOUDFLARE_R2_CONFIG_OPTIONS = {
+    "bucket_name": CLOUDFLARE_R2_BUCKET,
+    "access_key": CLOUDFLARE_R2_ACCESS_KEY,
+    "secret_key": CLOUDFLARE_R2_SECRET_KEY,
+    "endpoint_url": CLOUDFLARE_R2_BUCKET_ENDPOINT,
+    "default_acl": "public-read", 
+    "signature_version": "s3v4",
+}
+
+STORAGES =  {
+    "default": {
+        "BACKEND": "helpers.cloudflare.storages.MediaFileStorage", 
+        "OPTIONS": CLOUDFLARE_R2_CONFIG_OPTIONS 
+    },
+    "staticfiles": {
+        "BACKEND": "helpers.cloudflare.storages.StaticFileStorage", 
+        "OPTIONS": CLOUDFLARE_R2_CONFIG_OPTIONS 
+    },
+}
+        
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+OSCAR_INITIAL_ORDER_STATUS = 'Pending'
+OSCAR_INITIAL_LINE_STATUS = 'Pending'
+OSCAR_ORDER_STATUS_PIPELINE = {
+    'Pending': ('Being processed', 'Cancelled',),
+    'Being processed': ('Processed', 'Cancelled',),
+    'Cancelled': (),
+}
 
